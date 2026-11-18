@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=SXM Remote
+Comment=Connexion Bureau à distance (RDP)
+Exec=sxm-remote
+Icon=preferences-desktop-remote-desktop
+Terminal=false
+Type=Application
+Categories=Network;RemoteAccess;
