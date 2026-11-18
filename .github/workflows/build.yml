@@ -1,0 +1,106 @@
+name: Compilation SXM Remote
+
+# Compile le .rpm (Fedora) et le .dmg (macOS) puis publie une Release
+# dès que la version change dans src-tauri/tauri.conf.json.
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['README.md', 'docs/**', 'legacy/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    name: Nouvelle version ?
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      publish: ${{ steps.v.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V=$(jq -r .version src-tauri/tauri.conf.json)
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          if gh release view "v$V" -R "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"; echo "La version $V est déjà publiée."
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  macos:
+    name: macOS (.dmg universel Intel + Apple Silicon)
+    needs: check
+    if: needs.check.outputs.publish == 'true'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - run: npm install
+      - run: npx tauri build --target universal-apple-darwin --bundles dmg
+        working-directory: src-tauri
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SXM-Remote-macOS
+          path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+
+  fedora:
+    name: Fedora (.rpm)
+    needs: check
+    if: needs.check.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: dtolnay/rust-toolchain@stable
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libsoup-3.0-dev libayatana-appindicator3-dev libdbus-1-dev rpm
+      - run: npm install
+      - run: npx tauri build --bundles rpm
+        working-directory: src-tauri
+      - name: Copie pour les installations 1.x (leur mise à jour cherche un .noarch.rpm)
+        run: |
+          cd src-tauri/target/release/bundle/rpm
+          f=$(ls *.x86_64.rpm | head -1)
+          cp "$f" "sxm-remote-${{ needs.check.outputs.version }}-depuis-v1.noarch.rpm"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SXM-Remote-Fedora
+          path: src-tauri/target/release/bundle/rpm/*.rpm
+
+  release:
+    name: Publication sur la page Releases
+    needs: [check, macos, fedora]
+    # Publie ce qui est prêt, même si une plateforme a échoué (ex. Mac indisponible chez GitHub)
+    if: always() && needs.check.outputs.publish == 'true' && (needs.fedora.result == 'success' || needs.macos.result == 'success')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - run: ls -la dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.check.outputs.version }}
+          name: SXM Remote ${{ needs.check.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          body: |
+            **Fedora** : `SXM.Remote-${{ needs.check.outputs.version }}-1.x86_64.rpm` → `sudo dnf install ./SXM.Remote-*.rpm`
+            **macOS** (Intel + Apple Silicon) : `SXM.Remote_${{ needs.check.outputs.version }}_universal.dmg`
+
+            Le fichier `…-depuis-v1.noarch.rpm` est le même paquet Fedora : il sert uniquement à la mise à jour automatique des versions 1.x.
+          files: dist/*

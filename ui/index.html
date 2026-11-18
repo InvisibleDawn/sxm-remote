@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SXM Remote</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<svg class="backdrop" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  <rect width="1440" height="900" fill="#7FB3E6"/>
+  <path d="M0 0 L520 0 L260 380Z" fill="#8CBDEB"/><path d="M520 0 L1100 0 L760 300Z" fill="#76AADF"/>
+  <path d="M1100 0 L1440 0 L1440 420Z" fill="#8FC0EC"/><path d="M0 380 L260 380 L0 900Z" fill="#6FA3DA"/>
+  <path d="M260 380 L760 300 L560 900 L0 900Z" fill="#7AAEE2"/><path d="M760 300 L1440 420 L1440 900 L560 900Z" fill="#6A9FD8"/>
+  <path d="M1100 0 L760 300 L1440 420Z" fill="#83B6E8"/>
+</svg>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12.5" rx="2"/><path d="M8.5 20.5h7M12 16.5v4"/><path d="m10.3 8 3.9 2.2-3.9 2.2z" fill="#fff"/></svg>
+      </div>
+      <div><strong>SXM Remote</strong><small id="ver">v2.0.0</small></div>
+    </div>
+    <nav class="nav">
+      <button class="nav-item on" data-view="home">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></svg>Mes PC<span class="count" id="pc-count" hidden>0</span></button>
+      <button class="nav-item" data-view="about">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v0"/></svg>À propos<span class="count dot" id="upd-dot" hidden>1</span></button>
+    </nav>
+    <div class="side-art" aria-hidden="true">
+      <svg viewBox="0 0 220 150">
+        <path d="M0 110 C50 80 90 120 140 95 S200 70 220 85 V150 H0z" fill="#DCE9FB"/>
+        <path d="M0 125 C60 105 120 140 220 115 V150 H0z" fill="#C6DBF7"/>
+        <g transform="translate(40 14)">
+          <rect x="74" y="8" width="72" height="50" rx="7" fill="#B7C4D6"/>
+          <rect x="80" y="14" width="60" height="38" rx="3" fill="#E9EFF7"/>
+          <rect x="102" y="58" width="16" height="10" fill="#B7C4D6"/><rect x="94" y="66" width="32" height="5" rx="2.5" fill="#B7C4D6"/>
+          <rect x="0" y="30" width="96" height="66" rx="9" fill="#1F5FD1"/>
+          <rect x="7" y="37" width="82" height="45" rx="4" fill="#2F72E6"/>
+          <text x="48" y="62" text-anchor="middle" font-family="Inter,sans-serif" font-weight="800" font-size="17" fill="#fff">SXM</text>
+          <text x="48" y="76" text-anchor="middle" font-family="Inter,sans-serif" font-size="10" fill="#CFE0FF">Remote</text>
+          <rect x="40" y="96" width="16" height="10" fill="#1F5FD1"/><rect x="28" y="104" width="40" height="6" rx="3" fill="#1F5FD1"/>
+          <path d="M100 42 q14 -18 28 -12" stroke="#1F5FD1" stroke-width="3" fill="none" stroke-linecap="round" stroke-dasharray="2 6"/>
+        </g>
+      </svg>
+      <p>Tous tes PC, à un clic.</p>
+    </div>
+  </aside>
+
+  <main>
+    <!-- Accueil -->
+    <section id="view-home" class="view">
+      <div class="hero">
+        <svg class="hero-art" viewBox="0 0 600 170" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+          <defs>
+            <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8EC9F2"/><stop offset="1" stop-color="#D9F0FB"/></linearGradient>
+            <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#26B5C9"/><stop offset="1" stop-color="#0E8FB0"/></linearGradient>
+          </defs>
+          <rect width="600" height="170" fill="url(#sky)"/>
+          <circle cx="520" cy="38" r="16" fill="#FFF3C4"/>
+          <path d="M120 112 L210 40 L250 70 L300 28 L370 82 L420 60 L500 108 Z" fill="#5E9C6A"/>
+          <path d="M160 112 L230 62 L280 90 L330 55 L400 100 L460 84 L540 112 Z" fill="#3F7F55"/>
+          <path d="M300 28 L318 42 L304 40 L292 46 Z" fill="#7DB386"/>
+          <rect y="104" width="600" height="66" fill="url(#sea)"/>
+          <path d="M0 132 C120 124 230 140 340 130 S520 122 600 128" stroke="#7FDDEA" stroke-width="2" fill="none" opacity=".7"/>
+          <path d="M380 112 C430 104 500 106 600 98 V116 C520 118 450 120 380 116Z" fill="#F4E3B5"/>
+          <g fill="#FFFFFF"><rect x="430" y="98" width="8" height="7"/><rect x="444" y="96" width="10" height="9"/><rect x="460" y="99" width="7" height="6"/></g>
+          <g fill="#E8735A"><path d="M429 98 l5-4 5 4z"/><path d="M443 96 l6-5 6 5z"/><path d="M459 99 l4-3 4 3z"/></g>
+          <path d="M70 150 l8 -6 l8 6 z" fill="#fff" opacity=".9"/>
+        </svg>
+        <div class="hero-text">
+          <h1>SXM Remote</h1>
+          <p>Connecte-toi à tes PC Windows,<br>au bureau ou à distance avec Tailscale.</p>
+        </div>
+      </div>
+
+      <div class="layout">
+        <div class="col-main">
+          <div class="update-bar" id="update-bar" hidden>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+            <span id="update-text"></span>
+            <button class="primary" id="update-go">Mettre à jour</button>
+          </div>
+          <div class="warn-box" id="engine-warn" hidden></div>
+          <div class="sec-head">
+            <h2>Mes PC</h2>
+            <label class="search">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              <input id="q" placeholder="Rechercher un PC…" aria-label="Rechercher un PC">
+            </label>
+          </div>
+          <div class="cards" id="cards"></div>
+        </div>
+
+        <div class="col-side">
+          <div class="box">
+            <h3>Connexion rapide</h3>
+            <form class="quick" id="quick">
+              <input id="quick-ip" placeholder="Adresse IP du PC" aria-label="Adresse IP du PC" autocomplete="off">
+              <button class="primary" type="submit">Aller</button>
+            </form>
+            <p class="muted">IP locale (192.168.x.x, 10.x.x.x) ou Tailscale (100.x.x.x).</p>
+          </div>
+
+          <div class="box">
+            <div class="box-head">
+              <h3>Appareils Tailscale</h3>
+              <button class="icon-btn" id="ts-refresh" aria-label="Actualiser les appareils Tailscale">
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button>
+            </div>
+            <div class="peers" id="peers"></div>
+          </div>
+
+          <button class="primary big" id="add-big">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            <span>Ajouter un PC</span></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- À propos -->
+    <section id="view-about" class="view" hidden>
+      <div class="page-head"><h1>À propos</h1></div>
+      <div class="box about">
+        <h2 id="about-title">SXM Remote</h2>
+        <p>Client Bureau à distance (RDP) pour Fedora et macOS, dans l'esprit de Windows App.</p>
+        <p class="muted" id="about-engine"></p>
+      </div>
+      <div class="box">
+        <h3>Raccourcis</h3>
+        <ul class="keys">
+          <li><kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Entrée</kbd><span>Quitter / revenir au plein écran</span></li>
+          <li><span class="k">Double-clic sur une carte</span><span>Se connecter</span></li>
+          <li><span class="k">Clic droit sur une carte</span><span>Modifier, dupliquer, supprimer</span></li>
+        </ul>
+      </div>
+      <div class="box">
+        <h3>Mises à jour</h3>
+        <p id="upd-status" class="muted"></p>
+        <div class="row">
+          <button class="ghost" id="upd-check">Rechercher une mise à jour</button>
+          <button class="primary" id="upd-install" hidden>Installer</button>
+        </div>
+        <label class="opt"><input type="checkbox" id="upd-auto" checked> Vérifier automatiquement au démarrage</label>
+      </div>
+      <div class="box about">
+        <p><strong>© 2026 Invisible_Dawn</strong><br>Logiciel libre distribué sous licence GNU GPL v3 ou ultérieure, sans aucune garantie.</p>
+        <p class="muted">Moteur de connexion : FreeRDP (Apache-2.0). Interface : Tauri (MIT / Apache-2.0).<br>Windows est une marque de Microsoft ; SXM Remote n'est pas affilié à Microsoft.</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Fenêtre : ajouter / modifier un PC -->
+<div class="modal" id="edit" hidden>
+  <form class="dialog" id="edit-form">
+    <h2 id="edit-title">Ajouter un PC</h2>
+    <div class="grid">
+      <label for="f-name">Nom</label><input id="f-name" placeholder="PC Bureau" autocomplete="off">
+      <label for="f-host">Adresse IP</label>
+      <div class="inline">
+        <input id="f-host" placeholder="192.168.1.20 ou 100.x.x.x" autocomplete="off" required>
+        <select id="f-ts" aria-label="Choisir un appareil Tailscale"><option value="">Tailscale…</option></select>
+      </div>
+      <label for="f-user">Utilisateur</label><input id="f-user" placeholder="Administrateur ou DOMAINE\utilisateur" autocomplete="off">
+      <label for="f-pw">Mot de passe</label><input id="f-pw" type="password" placeholder="Facultatif" autocomplete="off">
+    </div>
+    <div class="checks">
+      <label class="opt"><input type="checkbox" id="f-full" checked> Plein écran</label>
+      <label class="opt"><input type="checkbox" id="f-multi"> Utiliser tous les écrans</label>
+      <label class="opt"><input type="checkbox" id="f-clip" checked> Presse-papiers partagé</label>
+      <label class="opt"><input type="checkbox" id="f-sound" checked> Son du PC distant</label>
+      <label class="opt"><input type="checkbox" id="f-drive"> Partager mon dossier personnel</label>
+    </div>
+    <p class="err" id="edit-err" hidden></p>
+    <div class="actions">
+      <button type="button" class="ghost" data-close>Annuler</button>
+      <button type="submit" class="primary" id="edit-ok">Enregistrer</button>
+    </div>
+  </form>
+</div>
+
+<!-- Fenêtre : identifiants à la connexion -->
+<div class="modal" id="login" hidden>
+  <form class="dialog small" id="login-form">
+    <h2 id="login-title">Connexion</h2>
+    <div class="grid">
+      <label for="l-user">Utilisateur</label><input id="l-user" autocomplete="off">
+      <label for="l-pw">Mot de passe</label><input id="l-pw" type="password" autocomplete="off">
+    </div>
+    <label class="opt"><input type="checkbox" id="l-save" checked> Mémoriser dans le trousseau</label>
+    <div class="actions">
+      <button type="button" class="ghost" data-close>Annuler</button>
+      <button type="submit" class="primary">Se connecter</button>
+    </div>
+  </form>
+</div>
+
+<!-- Fenêtre : confirmation -->
+<div class="modal" id="confirm" hidden>
+  <div class="dialog small">
+    <h2 id="confirm-title"></h2>
+    <p id="confirm-text" class="muted"></p>
+    <div class="actions">
+      <button type="button" class="ghost" data-close>Annuler</button>
+      <button type="button" class="danger" id="confirm-ok">Supprimer</button>
+    </div>
+  </div>
+</div>
+
+<div class="menu" id="menu" hidden>
+  <button data-act="connect">Se connecter</button>
+  <button data-act="edit">Modifier</button>
+  <button data-act="dup">Dupliquer</button>
+  <hr>
+  <button data-act="del" class="del">Supprimer</button>
+</div>
+
+<div id="toast" role="status" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>

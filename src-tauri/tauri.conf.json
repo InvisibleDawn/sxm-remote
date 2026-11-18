@@ -1,0 +1,62 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "SXM Remote",
+  "mainBinaryName": "sxm-remote",
+  "version": "2.0.0",
+  "identifier": "com.sxm.remote",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "SXM Remote",
+        "width": 1200,
+        "height": 780,
+        "minWidth": 980,
+        "minHeight": 640
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "rpm",
+      "dmg"
+    ],
+    "category": "Utility",
+    "shortDescription": "Bureau à distance (RDP)",
+    "longDescription": "Client Bureau à distance simple pour se connecter à ses PC Windows par IP locale ou Tailscale.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "linux": {
+      "rpm": {
+        "depends": [
+          "freerdp",
+          "libsecret",
+          "polkit",
+          "webkit2gtk4.1",
+          "gtk3"
+        ]
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    },
+    "copyright": "© 2026 Invisible_Dawn",
+    "license": "GPL-3.0-or-later",
+    "publisher": "Invisible_Dawn",
+    "licenseFile": "../LICENSE"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "sxm-remote",
+  "version": "2.0.0",
+  "description": "Client Bureau à distance (RDP) pour Fedora et macOS, dans le style de Windows App. Moteur : FreeRDP.",
+  "scripts": {},
+  "author": "Invisible_Dawn",
+  "license": "GPL-3.0-or-later",
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.4"
+  },
+  "private": true
+}
