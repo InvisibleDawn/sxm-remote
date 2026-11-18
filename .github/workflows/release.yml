@@ -1,0 +1,34 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  rpm:
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Outils RPM
+        run: dnf install -y rpm-build
+      - name: Version du tag = version du paquet
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          sed -i "s/^VERSION = .*/VERSION = \"$V\"/" sxm-remote.py
+          sed -i "s/^Version:.*/Version:        $V/" packaging/sxm-remote.spec
+      - name: Construire le .rpm
+        run: |
+          mkdir -p ~/rpmbuild/SOURCES
+          cp sxm-remote.py sxm-remote.desktop ~/rpmbuild/SOURCES/
+          rpmbuild -bb --undefine dist packaging/sxm-remote.spec
+          cp ~/rpmbuild/RPMS/noarch/*.rpm .
+      - name: Publier la release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: SXM Remote ${{ github.ref_name }}
+          files: "*.noarch.rpm"
+          generate_release_notes: true
