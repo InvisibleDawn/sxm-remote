@@ -1,6 +1,6 @@
 [package]
 name = "sxm-remote"
-version = "2.0.0"
+version = "2.0.1"
 description = "Client Bureau à distance (RDP) pour Fedora et macOS"
 authors = ["Invisible_Dawn"]
 edition = "2021"

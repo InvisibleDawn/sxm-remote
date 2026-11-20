@@ -3,6 +3,8 @@
 Client Bureau à distance (RDP) pour **Fedora** et **macOS**, dans l'esprit de Windows App.
 Interface Tauri, moteur de connexion FreeRDP.
 
+![SXM Remote](docs/banner.jpg)
+
 ![Aperçu](docs/screenshot.png)
 
 ## Fonctions
