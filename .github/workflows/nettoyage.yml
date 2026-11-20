@@ -1,39 +1,26 @@
 name: Nettoyage ponctuel
 
-# Supprime les anciennes Releases (fichiers avec l'ancien nom d'auteur)
-# et rattache la Release v2.1.1 à l'historique réécrit. S'exécute une seule fois.
+# Efface l'historique des anciennes compilations (onglet Actions),
+# qui affichait l'ancien nom d'auteur. S'exécute une seule fois.
 on:
   push:
     branches: [main]
     paths: ['.github/workflows/nettoyage.yml']
 
 permissions:
-  contents: write
+  actions: write
+  contents: read
 
 jobs:
   nettoyage:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Supprimer les anciennes Releases et leurs tags
+      - name: Supprimer les anciennes exécutions
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for t in v1.3 v2.0.0 v2.0.1 v2.1.0; do
-            gh release delete "$t" --yes --cleanup-tag -R "${{ github.repository }}" || true
-            git push origin ":refs/tags/$t" 2>/dev/null || true
+          gh api --paginate "repos/${{ github.repository }}/actions/runs?per_page=100" --jq '.workflow_runs[].id' |
+          while read id; do
+            [ "$id" = "${{ github.run_id }}" ] && continue
+            gh api -X DELETE "repos/${{ github.repository }}/actions/runs/$id" && echo "supprimé $id" || true
           done
-      - name: Rattacher v2.1.1 au nouvel historique
-        run: |
-          git config user.name "Invisible_Dawn"
-          git config user.email "InvisibleDawn@users.noreply.github.com"
-          git tag -f v2.1.1 52fa46b6aae15a6620279519edad447263deff15
-          git push -f origin refs/tags/v2.1.1
-      - name: Vérification
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release list -R "${{ github.repository }}"
-          git ls-remote --tags origin
