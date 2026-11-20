@@ -1,7 +1,7 @@
 [package]
 name = "sxm-remote"
-version = "2.0.1"
-description = "Client Bureau à distance (RDP) pour Fedora et macOS"
+version = "2.1.0"
+description = "Client Bureau à distance (RDP) pour Windows, Fedora et macOS"
 authors = ["Invisible_Dawn"]
 edition = "2021"
 license = "GPL-3.0-or-later"
@@ -23,3 +23,6 @@ keyring = { version = "3", features = ["apple-native"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "3", features = ["sync-secret-service", "crypto-rust"] }
+
+[target.'cfg(windows)'.dependencies]
+keyring = { version = "3", features = ["windows-native"] }

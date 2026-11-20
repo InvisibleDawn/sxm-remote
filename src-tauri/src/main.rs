@@ -11,6 +11,15 @@ use tauri::{AppHandle, Emitter};
 use tokio::process::Command;
 
 const GITHUB_REPO: &str = "InvisibleDawn/sxm-remote";
+
+/// Commande externe ; sous Windows, sans ouvrir de fenêtre console.
+fn cmd<S: AsRef<std::ffi::OsStr>>(program: S) -> Command {
+    #[allow(unused_mut)]
+    let mut c = Command::new(program);
+    #[cfg(windows)]
+    c.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    c
+}
 const KEYRING_SERVICE: &str = "SXM Remote";
 
 /* ---------- fichiers de configuration ---------- */
@@ -82,7 +91,7 @@ fn entry(id: &str) -> Result<keyring::Entry, String> {
 /// Mot de passe enregistré par la v1 (Python, schéma com.sxm.rdp) : récupéré une fois puis migré.
 #[cfg(target_os = "linux")]
 async fn legacy_password(id: &str) -> Option<String> {
-    let out = Command::new("secret-tool").args(["lookup", "id", id]).output().await.ok()?;
+    let out = cmd("secret-tool").args(["lookup", "id", id]).output().await.ok()?;
     let pw = String::from_utf8_lossy(&out.stdout).to_string();
     (out.status.success() && !pw.is_empty()).then_some(pw)
 }
@@ -144,15 +153,34 @@ fn which(names: &[&str]) -> Option<PathBuf> {
     None
 }
 
+/// Windows : le client Bureau à distance intégré (mstsc).
+#[cfg(windows)]
 fn freerdp() -> Option<PathBuf> {
-    // macOS : le client SDL fonctionne sans XQuartz. Linux : le client X11, éprouvé sous MATE.
-    #[cfg(target_os = "macos")]
-    let names = ["sdl-freerdp3", "sdl-freerdp", "xfreerdp3", "xfreerdp"];
-    #[cfg(not(target_os = "macos"))]
-    let names = ["xfreerdp3", "xfreerdp", "sdl-freerdp3", "sdl-freerdp"];
-    which(&names)
+    let root = std::env::var_os("SystemRoot").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
+    let p = root.join("System32").join("mstsc.exe");
+    p.is_file().then_some(p)
 }
 
+/// macOS : le client SDL fonctionne sans XQuartz.
+#[cfg(target_os = "macos")]
+fn freerdp() -> Option<PathBuf> {
+    which(&["sdl-freerdp3", "sdl-freerdp", "xfreerdp3", "xfreerdp"])
+}
+
+/// Linux : le client X11, éprouvé sous MATE.
+#[cfg(target_os = "linux")]
+fn freerdp() -> Option<PathBuf> {
+    which(&["xfreerdp3", "xfreerdp", "sdl-freerdp3", "sdl-freerdp"])
+}
+
+#[cfg(windows)]
+fn tailscale() -> Option<PathBuf> {
+    let pf = std::env::var_os("ProgramFiles").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(r"C:\Program Files"));
+    let p = pf.join("Tailscale").join("tailscale.exe");
+    p.is_file().then_some(p).or_else(|| which(&["tailscale.exe"]))
+}
+
+#[cfg(not(windows))]
 fn tailscale() -> Option<PathBuf> {
     let app = PathBuf::from("/Applications/Tailscale.app/Contents/MacOS/Tailscale");
     which(&["tailscale"]).or_else(|| app.is_file().then_some(app))
@@ -162,19 +190,25 @@ fn tailscale() -> Option<PathBuf> {
 struct Engine {
     path: Option<String>,
     version: Option<String>,
+    /// "mstsc" (Windows) ou "freerdp"
+    kind: &'static str,
 }
 
 #[tauri::command]
 async fn engine() -> Engine {
-    let Some(p) = freerdp() else { return Engine { path: None, version: None } };
-    let version = Command::new(&p).arg("--version").output().await.ok().and_then(|o| {
+    let kind = if cfg!(windows) { "mstsc" } else { "freerdp" };
+    let Some(p) = freerdp() else { return Engine { path: None, version: None, kind } };
+    if cfg!(windows) {
+        return Engine { path: Some(p.display().to_string()), version: None, kind };
+    }
+    let version = cmd(&p).arg("--version").output().await.ok().and_then(|o| {
         let s = String::from_utf8_lossy(&o.stdout).to_string() + &String::from_utf8_lossy(&o.stderr);
         s.split_whitespace()
             .skip_while(|w| *w != "version")
             .nth(1)
             .map(String::from)
     });
-    Engine { path: Some(p.display().to_string()), version }
+    Engine { path: Some(p.display().to_string()), version, kind }
 }
 
 #[derive(Serialize)]
@@ -189,7 +223,7 @@ async fn tailscale_peers() -> Vec<Peer> {
     let Some(ts) = tailscale() else { return vec![] };
     let Ok(Ok(out)) = tokio::time::timeout(
         std::time::Duration::from_secs(5),
-        Command::new(ts).args(["status", "--json"]).output(),
+        cmd(ts).args(["status", "--json"]).output(),
     )
     .await
     else {
@@ -240,9 +274,73 @@ struct RdpExit {
     detail: String,
 }
 
+/// Windows : identifiants placés dans le Gestionnaire d'identification le temps de la connexion,
+/// puis un fichier .rdp temporaire ouvert avec mstsc.
+#[cfg(windows)]
+async fn connect_windows(app: AppHandle, exe: PathBuf, conn: Value, password: String) -> Result<(), String> {
+    let host = text(&conn, "host");
+    if !valid_host(&host) {
+        return Err("Adresse IP invalide.".into());
+    }
+    let id = text(&conn, "id");
+    let user = text(&conn, "user");
+    let target = format!("TERMSRV/{host}");
+    if !user.is_empty() && !password.is_empty() {
+        let _ = cmd("cmdkey")
+            .arg(format!("/generic:{target}"))
+            .arg(format!("/user:{user}"))
+            .arg(format!("/pass:{password}"))
+            .output()
+            .await;
+    }
+    let full = flag(&conn, "fullscreen", true);
+    let mut rdp = vec![
+        format!("full address:s:{host}"),
+        format!("username:s:{user}"),
+        format!("screen mode id:i:{}", if full { 2 } else { 1 }),
+        "desktopwidth:i:1600".into(),
+        "desktopheight:i:900".into(),
+        "dynamic resolution:i:1".into(),
+        "smart sizing:i:1".into(),
+        format!("use multimon:i:{}", flag(&conn, "multimon", false) as i32),
+        format!("redirectclipboard:i:{}", flag(&conn, "clipboard", true) as i32),
+        format!("audiomode:i:{}", if flag(&conn, "sound", true) { 0 } else { 2 }),
+        "autoreconnection enabled:i:1".into(),
+        "authentication level:i:2".into(),
+        "prompt for credentials:i:0".into(),
+        "promptcredentialonce:i:1".into(),
+    ];
+    if flag(&conn, "drive", false) {
+        rdp.push("drivestoredirect:s:*".into());
+    }
+    let file = std::env::temp_dir().join(format!("sxm-remote-{}.rdp", if valid_id(&id) { &id } else { "rapide" }));
+    tokio::fs::write(&file, rdp.join("\r\n")).await.map_err(|e| e.to_string())?;
+    let child = cmd(&exe).arg(&file).spawn().map_err(|e| format!("Impossible de lancer le Bureau à distance : {e}"))?;
+    tauri::async_runtime::spawn(async move {
+        let _ = child.wait_with_output().await;
+        let _ = tokio::fs::remove_file(&file).await;
+        let _ = cmd("cmdkey").arg(format!("/delete:{target}")).output().await;
+        let _ = app.emit("rdp-exit", RdpExit { id, kind: "ok".into(), detail: String::new() });
+    });
+    Ok(())
+}
+
 #[tauri::command]
 async fn connect(app: AppHandle, conn: Value, password: String) -> Result<(), String> {
+    #[cfg(windows)]
+    let exe = freerdp().ok_or("Le Bureau à distance de Windows (mstsc) est introuvable.")?;
+    #[cfg(not(windows))]
     let exe = freerdp().ok_or("FreeRDP n'est pas installé.")?;
+    #[cfg(windows)]
+    let r = connect_windows(app, exe, conn, password).await;
+    #[cfg(not(windows))]
+    let r = connect_freerdp(app, exe, conn, password).await;
+    r
+}
+
+/// Linux et macOS : FreeRDP.
+#[cfg(not(windows))]
+async fn connect_freerdp(app: AppHandle, exe: PathBuf, conn: Value, password: String) -> Result<(), String> {
     let host = text(&conn, "host");
     if !valid_host(&host) {
         return Err("Adresse IP invalide.".into());
@@ -285,7 +383,7 @@ async fn connect(app: AppHandle, conn: Value, password: String) -> Result<(), St
         }
     }
 
-    let child = Command::new(&exe)
+    let child = cmd(&exe)
         .args(&args)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -358,7 +456,9 @@ async fn check_update() -> Result<Release, String> {
         .unwrap_or_default();
     #[cfg(target_os = "macos")]
     let pick = assets.iter().find(|u| u.ends_with(".dmg"));
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    let pick = assets.iter().find(|u| u.ends_with("-setup.exe")).or_else(|| assets.iter().find(|u| u.ends_with(".exe")));
+    #[cfg(target_os = "linux")]
     let pick = assets
         .iter()
         .find(|u| u.ends_with(".x86_64.rpm"))
@@ -377,13 +477,13 @@ fn app_version() -> &'static str {
 
 #[tauri::command]
 fn platform() -> &'static str {
-    if cfg!(target_os = "macos") { "macos" } else { "linux" }
+    if cfg!(target_os = "macos") { "macos" } else if cfg!(windows) { "windows" } else { "linux" }
 }
 
 /// Télécharge la nouvelle version puis l'installe (Fedora) ou ouvre le .dmg (macOS).
 /// Renvoie "installed" (il faut redémarrer) ou "opened" (l'utilisateur glisse l'appli).
 #[tauri::command]
-async fn install_update(url: String) -> Result<String, String> {
+async fn install_update(app: AppHandle, url: String) -> Result<String, String> {
     let prefix = format!("https://github.com/{GITHUB_REPO}/releases/download/");
     if !url.starts_with(&prefix) || url.contains("..") {
         return Err("Adresse de mise à jour non autorisée.".into());
@@ -391,6 +491,8 @@ async fn install_update(url: String) -> Result<String, String> {
     let file = url.rsplit('/').next().unwrap_or("sxm-remote-update").to_string();
     let dir = if cfg!(target_os = "macos") {
         dirs::download_dir().or_else(dirs::home_dir).ok_or("Dossier Téléchargements introuvable.")?
+    } else if cfg!(windows) {
+        std::env::temp_dir().join("sxm-remote")
     } else {
         dirs::cache_dir().ok_or("Dossier cache introuvable.")?.join("sxm-remote")
     };
@@ -410,10 +512,21 @@ async fn install_update(url: String) -> Result<String, String> {
     tokio::fs::write(&dest, &bytes).await.map_err(|e| e.to_string())?;
 
     if cfg!(target_os = "macos") {
-        Command::new("open").arg(&dest).status().await.map_err(|e| e.to_string())?;
+        cmd("open").arg(&dest).status().await.map_err(|e| e.to_string())?;
         return Ok("opened".into());
     }
-    let out = Command::new("pkexec")
+    if cfg!(windows) {
+        // L'installateur remplace l'appli : on le lance puis on ferme SXM Remote.
+        Command::new(&dest).spawn().map_err(|e| format!("Impossible de lancer l'installation : {e}"))?;
+        let app2 = app.clone();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+            app2.exit(0);
+        });
+        return Ok("launched".into());
+    }
+    let _ = &app;
+    let out = cmd("pkexec")
         .args(["dnf", "install", "-y"])
         .arg(&dest)
         .output()

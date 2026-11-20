@@ -1,6 +1,6 @@
 name: Compilation SXM Remote
 
-# Compile le .rpm (Fedora) et le .dmg (macOS) puis publie une Release
+# Compile l'installateur .exe (Windows), le .rpm (Fedora) et le .dmg (macOS) puis publie une Release
 # dès que la version change dans src-tauri/tauri.conf.json.
 on:
   push:
@@ -53,6 +53,25 @@ jobs:
           name: SXM-Remote-macOS
           path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
 
+  windows:
+    name: Windows (installateur .exe)
+    needs: check
+    if: needs.check.outputs.publish == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: dtolnay/rust-toolchain@stable
+      - run: npm install
+      - run: npx tauri build --bundles nsis
+        working-directory: src-tauri
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SXM-Remote-Windows
+          path: src-tauri/target/release/bundle/nsis/*-setup.exe
+
   fedora:
     name: Fedora (.rpm)
     needs: check
@@ -82,9 +101,9 @@ jobs:
 
   release:
     name: Publication sur la page Releases
-    needs: [check, macos, fedora]
+    needs: [check, windows, macos, fedora]
     # Publie ce qui est prêt, même si une plateforme a échoué (ex. Mac indisponible chez GitHub)
-    if: always() && needs.check.outputs.publish == 'true' && (needs.fedora.result == 'success' || needs.macos.result == 'success')
+    if: always() && needs.check.outputs.publish == 'true' && (needs.fedora.result == 'success' || needs.macos.result == 'success' || needs.windows.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -99,6 +118,7 @@ jobs:
           target_commitish: ${{ github.sha }}
           make_latest: true
           body: |
+            **Windows** (10 et 11) : `SXM.Remote_${{ needs.check.outputs.version }}_x64-setup.exe`
             **Fedora** : `SXM.Remote-${{ needs.check.outputs.version }}-1.x86_64.rpm` → `sudo dnf install ./SXM.Remote-*.rpm`
             **macOS** (Intel + Apple Silicon) : `SXM.Remote_${{ needs.check.outputs.version }}_universal.dmg`
 

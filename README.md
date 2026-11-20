@@ -1,7 +1,7 @@
 # SXM Remote
 
-Client Bureau à distance (RDP) pour **Fedora** et **macOS**, dans l'esprit de Windows App.
-Interface Tauri, moteur de connexion FreeRDP.
+Client Bureau à distance (RDP) pour **Windows**, **Fedora** et **macOS**, dans l'esprit de Windows App.
+Interface Tauri. Moteur de connexion : Bureau à distance de Windows (mstsc) sous Windows, FreeRDP sous Fedora et macOS.
 
 ![SXM Remote](docs/banner.jpg)
 
@@ -10,13 +10,18 @@ Interface Tauri, moteur de connexion FreeRDP.
 ## Fonctions
 - Tes PC en cartes, connexion en un clic (IP locale ou Tailscale)
 - Connexion rapide par IP et liste des appareils Tailscale (en ligne / hors ligne)
-- Mots de passe dans le trousseau du système (GNOME Keyring / Trousseau macOS)
+- Mots de passe dans le trousseau du système (Gestionnaire d'identification Windows / GNOME Keyring / Trousseau macOS)
+- Thème clair et sombre
 - Plein écran, multi-écran, presse-papiers, son, partage de dossier
 - Mise à jour intégrée depuis les Releases GitHub
 
 ## Installation
 
 Télécharge le fichier de ta plateforme dans la dernière [Release](../../releases/latest).
+
+**Windows** (10 et 11)
+Lance `SXM.Remote_*_x64-setup.exe`. Aucun droit administrateur n'est nécessaire, et le Bureau à distance de Windows sert de moteur.
+Au premier lancement, Windows SmartScreen peut afficher « Windows a protégé votre ordinateur » : clique sur **Informations complémentaires › Exécuter quand même** (l'appli n'est pas signée).
 
 **Fedora**
 ```
@@ -33,7 +38,7 @@ Raccourci utile : **Ctrl + Alt + Entrée** pour quitter / revenir au plein écra
 
 ## Publier une nouvelle version
 Changer `version` dans `src-tauri/tauri.conf.json` (et `Cargo.toml`, `package.json`) puis pousser sur `main` :
-l'action GitHub compile le `.rpm` et le `.dmg` et publie la Release. Les applis installées la proposent ensuite d'elles-mêmes.
+l'action GitHub compile le `.exe`, le `.rpm` et le `.dmg` et publie la Release. Les applis installées la proposent ensuite d'elles-mêmes.
 
 ## Licence
 © 2026 Invisible_Dawn — GNU GPL v3 ou ultérieure.

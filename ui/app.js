@@ -3,19 +3,16 @@ const T = window.__TAURI__;
 const invoke = T.core.invoke;
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const icon = (n) => `<svg class="lucide" aria-hidden="true"><use href="#i-${n}"/></svg>`;
 
-const PALETTE = ['#16A08A', '#5AA33F', '#2F6CC7', '#D02A64', '#4A5468', '#1A6BE6', '#8A4BD6', '#E3862A'];
-const ICON_PC = '<svg class="pc" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12.5" rx="2"/><path d="M8.5 20.5h7M12 16.5v4"/></svg>';
-const ICON_WM = '<svg class="wm" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12.5" rx="2"/><path d="M8.5 20.5h7M12 16.5v4"/></svg>';
-const ICON_PLAY = '<svg viewBox="0 0 24 24"><path d="M7 4.5v15l12.5-7.5z"/></svg>';
-const ICON_MORE = '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
-
+const PALETTE = ['#1867d8', '#16a34a', '#0891b2', '#7c3aed', '#db2777', '#ea580c', '#4f46e5', '#059669'];
 const state = { conns: [], settings: {}, peers: [], engine: null, os: 'linux', version: '', update: null, q: '', busy: new Set() };
 
 /* ---------- utilitaires ---------- */
-function toast(msg, ms = 4500) {
-  const t = $('#toast'); t.textContent = msg; t.hidden = false;
-  clearTimeout(toast.h); toast.h = setTimeout(() => (t.hidden = true), ms);
+function toast(msg, kind = '', ms = 5000) {
+  const t = document.createElement('div');
+  t.className = 'toast ' + kind; t.textContent = msg; t.setAttribute('role', 'status');
+  $('#toasts').append(t); setTimeout(() => t.remove(), ms);
 }
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
 function colorOf(id) {
@@ -34,63 +31,70 @@ function newer(a, b) {
 }
 async function saveConns() {
   try { await invoke('save_connections', { conns: state.conns }); }
-  catch (e) { toast('Impossible d’enregistrer : ' + e); }
+  catch (e) { toast('Impossible d’enregistrer : ' + e, 'err'); }
 }
 
-/* ---------- navigation ---------- */
+/* ---------- navigation et barre latérale ---------- */
 function show(view) {
   ['home', 'about'].forEach((v) => ($('#view-' + v).hidden = v !== view));
-  document.querySelectorAll('.nav-item').forEach((b) => b.classList.toggle('on', b.dataset.view === view));
+  document.body.classList.toggle('at-home', view === 'home');
+  document.body.classList.toggle('at-about', view === 'about');
 }
-document.querySelectorAll('.nav-item').forEach((b) => (b.onclick = () => show(b.dataset.view)));
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem('sxm-theme', t); } catch {}
+}
+const ACTIONS = {
+  home: () => show('home'),
+  about: () => show('about'),
+  add: () => openEdit(),
+  quick: () => { show('home'); $('#quick-ip').focus(); },
+  tailscale: () => { show('home'); $('#ts-head').scrollIntoView({ behavior: 'smooth' }); loadPeers(); },
+  theme: () => applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'),
+};
+document.querySelectorAll('#rail [data-act]').forEach((b) => (b.onclick = () => ACTIONS[b.dataset.act]?.()));
 
-/* ---------- cartes ---------- */
+/* ---------- cartes des PC ---------- */
 function renderCards() {
   const q = state.q.toLowerCase();
   const list = [...state.conns]
     .sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' }))
     .filter((c) => !q || c.name.toLowerCase().includes(q) || c.host.toLowerCase().includes(q));
   const html = list.map((c) => {
-    const ts = isTailscale(c.host);
-    return `<article class="card ${state.busy.has(c.id) ? 'busy' : ''}" data-id="${esc(c.id)}" style="--c:${colorOf(c.id)}">
-      <div class="banner">${ICON_WM}</div>
-      <div class="top"><div class="disc" style="background:${colorOf(c.id)}">${ICON_PC}</div>
-        <div><h4 title="${esc(c.name)}">${esc(c.name)}</h4></div></div>
-      <div class="who">${c.user ? esc(c.user) : 'Identifiants demandés à la connexion'}</div>
-      <div class="foot"><span class="pill">${esc(c.host)}</span>
-        <span class="tag ${ts ? 'ts' : 'lan'}">${ts ? 'Tailscale' : 'Réseau local'}</span></div>
-      <div class="acts"><button class="primary" data-act="connect">${ICON_PLAY}<span>${state.busy.has(c.id) ? 'Connexion…' : 'Se connecter'}</span></button>
-        <button class="more" data-act="menu" aria-label="Options de ${esc(c.name)}">${ICON_MORE}</button></div>
-    </article>`;
+    const ts = isTailscale(c.host), busy = state.busy.has(c.id);
+    return `<div class="home-card ${busy ? 'busy' : ''}" data-id="${esc(c.id)}" tabindex="0" title="Double-clic pour se connecter">
+      <span class="ic" style="--ic:${colorOf(c.id)}">${icon('monitor')}</span>
+      <span class="txt"><b>${esc(c.name)}</b>
+        <span>${c.user ? esc(c.user) : 'Identifiants demandés à la connexion'}</span>
+        <span class="chips"><span class="chip ip">${esc(c.host)}</span><span class="chip ${ts ? 'ts' : 'lan'}">${ts ? 'Tailscale' : 'Réseau local'}</span></span></span>
+      <span class="acts">
+        <button class="go" data-act="connect" title="${busy ? 'Connexion…' : 'Se connecter'}" aria-label="Se connecter à ${esc(c.name)}">${icon('play')}</button>
+        <button class="more" data-act="menu" title="Options" aria-label="Options de ${esc(c.name)}">${icon('ellipsis')}</button>
+      </span></div>`;
   }).join('');
-  const add = `<button class="card add" id="add-card">
-      <div class="disc"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div>
-      <h4>Ajouter un PC</h4><p>Par IP locale ou Tailscale</p></button>`;
+  const add = `<button class="home-card add" id="add-card"><span class="ic">${icon('plus')}</span>
+      <span class="txt"><b>Ajouter un PC</b><span>Par IP locale ou Tailscale.</span></span></button>`;
   const hint = q && !list.length ? `<p class="empty-hint">Aucun PC ne correspond à « ${esc(state.q)} ».</p>` : '';
   $('#cards').innerHTML = hint + html + add;
   $('#add-card').onclick = () => openEdit();
   const n = state.conns.length;
   $('#pc-count').textContent = n; $('#pc-count').hidden = !n;
+  $('#pc-chip').textContent = n ? `${n} PC` : '';
+  $('#st-count').textContent = n ? `${n} PC enregistré${n > 1 ? 's' : ''}` : 'Aucun PC enregistré';
 }
 
+const connOf = (el) => { const card = el.closest('.home-card[data-id]'); return card && state.conns.find((x) => x.id === card.dataset.id); };
 $('#cards').addEventListener('click', (e) => {
-  const card = e.target.closest('.card[data-id]'); if (!card) return;
-  const c = state.conns.find((x) => x.id === card.dataset.id); if (!c) return;
+  const c = connOf(e.target); if (!c) return;
   const act = e.target.closest('[data-act]')?.dataset.act;
   if (act === 'connect') connectTo(c);
-  else if (act === 'menu') { const r = e.target.closest('.more').getBoundingClientRect(); openMenu(c, r.right - 180, r.bottom + 6); }
+  else if (act === 'menu') { const r = e.target.closest('.more').getBoundingClientRect(); openMenu(c, r.right - 200, r.bottom + 6); }
 });
-$('#cards').addEventListener('dblclick', (e) => {
-  if (e.target.closest('button')) return;
-  const card = e.target.closest('.card[data-id]');
-  const c = card && state.conns.find((x) => x.id === card.dataset.id);
-  if (c) connectTo(c);
-});
+$('#cards').addEventListener('dblclick', (e) => { if (e.target.closest('button')) return; const c = connOf(e.target); if (c) connectTo(c); });
+$('#cards').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('.home-card[data-id]')) { const c = connOf(e.target); if (c) connectTo(c); } });
 $('#cards').addEventListener('contextmenu', (e) => {
-  const card = e.target.closest('.card[data-id]'); if (!card) return;
-  e.preventDefault();
-  const c = state.conns.find((x) => x.id === card.dataset.id);
-  if (c) openMenu(c, e.clientX, e.clientY);
+  const c = connOf(e.target); if (!c) return;
+  e.preventDefault(); openMenu(c, e.clientX, e.clientY);
 });
 $('#q').oninput = (e) => { state.q = e.target.value; renderCards(); };
 
@@ -99,7 +103,7 @@ let menuConn = null;
 function openMenu(c, x, y) {
   menuConn = c;
   const m = $('#menu'); m.hidden = false;
-  m.style.left = Math.min(x, innerWidth - m.offsetWidth - 10) + 'px';
+  m.style.left = Math.max(8, Math.min(x, innerWidth - m.offsetWidth - 10)) + 'px';
   m.style.top = Math.min(y, innerHeight - m.offsetHeight - 10) + 'px';
 }
 document.addEventListener('mousedown', (e) => { if (!e.target.closest('#menu')) $('#menu').hidden = true; });
@@ -118,14 +122,16 @@ $('#menu').onclick = async (e) => {
 };
 
 /* ---------- fenêtres ---------- */
-function openModal(id) { $(id).hidden = false; }
-function closeModal(id) { $(id).hidden = true; }
-document.querySelectorAll('.modal').forEach((m) => {
-  m.addEventListener('mousedown', (e) => { if (e.target === m) m.hidden = true; });
-  m.querySelectorAll('[data-close]').forEach((b) => (b.onclick = () => (m.hidden = true)));
+const openModal = (id) => ($(id).hidden = false);
+const closeModal = (id) => ($(id).hidden = true);
+document.querySelectorAll('.modal-bg').forEach((m) => {
+  m.addEventListener('mousedown', (e) => { if (e.target === m) m.querySelector('[data-close]')?.click(); });
+  m.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => (m.hidden = true)));
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { document.querySelectorAll('.modal').forEach((m) => (m.hidden = true)); $('#menu').hidden = true; }
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('.modal-bg:not([hidden])').forEach((m) => m.querySelector('[data-close]')?.click());
+  $('#menu').hidden = true;
 });
 
 let editing = null, afterSave = null;
@@ -153,7 +159,9 @@ $('#f-ts').onchange = (e) => {
 $('#edit-form').onsubmit = async (e) => {
   e.preventDefault();
   const host = $('#f-host').value.trim();
-  if (!/^[A-Za-z0-9.\-:\[\]_]+$/.test(host)) { $('#edit-err').textContent = 'Indique une adresse IP ou un nom de PC valide.'; $('#edit-err').hidden = false; $('#f-host').focus(); return; }
+  if (!/^[A-Za-z0-9.\-:\[\]_]+$/.test(host)) {
+    $('#edit-err').textContent = 'Indique une adresse IP ou un nom de PC valide.'; $('#edit-err').hidden = false; $('#f-host').focus(); return;
+  }
   const vals = {
     name: $('#f-name').value.trim() || host, host, user: $('#f-user').value.trim(),
     fullscreen: $('#f-full').checked, multimon: $('#f-multi').checked, clipboard: $('#f-clip').checked,
@@ -162,7 +170,7 @@ $('#edit-form').onsubmit = async (e) => {
   let c = editing;
   if (c) Object.assign(c, vals); else { c = { id: uid(), ...vals }; state.conns.push(c); }
   try { await invoke('pw_set', { id: c.id, password: $('#f-pw').value }); }
-  catch (err) { toast('Le mot de passe n’a pas pu être mémorisé : ' + err); }
+  catch (err) { toast('Le mot de passe n’a pas pu être mémorisé : ' + err, 'err'); }
   await saveConns(); renderCards(); renderPeers(); closeModal('#edit');
   const then = afterSave; afterSave = null; if (then) then(c);
 };
@@ -184,13 +192,12 @@ function askLogin(c) {
     $('#l-user').value = c.user || ''; $('#l-pw').value = '';
     openModal('#login');
     (c.user ? $('#l-pw') : $('#l-user')).focus();
-    const cancel = () => { resolve(null); };
-    $('#login').querySelector('[data-close]').onclick = () => { closeModal('#login'); cancel(); };
+    $('#login').querySelector('[data-close]').onclick = () => { closeModal('#login'); resolve(null); };
     $('#login-form').onsubmit = async (e) => {
       e.preventDefault();
       c.user = $('#l-user').value.trim();
       const pw = $('#l-pw').value;
-      if ($('#l-save').checked) { try { await invoke('pw_set', { id: c.id, password: pw }); } catch (err) { toast('Trousseau indisponible : ' + err); } }
+      if ($('#l-save').checked) { try { await invoke('pw_set', { id: c.id, password: pw }); } catch (err) { toast('Trousseau indisponible : ' + err, 'err'); } }
       await saveConns(); renderCards(); closeModal('#login'); resolve(pw);
     };
   });
@@ -198,7 +205,7 @@ function askLogin(c) {
 
 /* ---------- connexion ---------- */
 async function connectTo(c) {
-  if (!state.engine?.path) { show('home'); $('#engine-warn').scrollIntoView({ behavior: 'smooth' }); toast('Installe d’abord FreeRDP (voir l’encadré orange).'); return; }
+  if (!state.engine?.path) { show('home'); $('#engine-warn').scrollIntoView({ behavior: 'smooth' }); toast('Installe d’abord FreeRDP (voir l’encadré orange).', 'err'); return; }
   if (state.busy.has(c.id)) return;
   let pw = null;
   try { pw = await invoke('pw_get', { id: c.id }); } catch {}
@@ -206,7 +213,7 @@ async function connectTo(c) {
   state.busy.add(c.id); renderCards();
   setTimeout(() => { state.busy.delete(c.id); renderCards(); }, 6000);
   try { await invoke('connect', { conn: c, password: pw }); }
-  catch (e) { state.busy.delete(c.id); renderCards(); toast(String(e)); }
+  catch (e) { state.busy.delete(c.id); renderCards(); toast(String(e), 'err'); }
 }
 
 T.event.listen('rdp-exit', async ({ payload }) => {
@@ -214,18 +221,18 @@ T.event.listen('rdp-exit', async ({ payload }) => {
   const c = state.conns.find((x) => x.id === payload.id); const name = c ? c.name : 'le PC';
   if (payload.kind === 'auth') {
     try { await invoke('pw_set', { id: payload.id, password: '' }); } catch {}
-    toast(`Identifiant ou mot de passe incorrect pour ${name}. Il te sera redemandé.`, 6000);
+    toast(`Identifiant ou mot de passe incorrect pour ${name}. Il te sera redemandé.`, 'err', 7000);
   } else if (payload.kind === 'unreachable') {
-    toast(`Impossible de joindre ${name}.\nVérifie l’IP, Tailscale et que le Bureau à distance est activé sur le PC.`, 7000);
+    toast(`Impossible de joindre ${name}.\nVérifie l’IP, Tailscale et que le Bureau à distance est activé sur le PC.`, 'err', 8000);
   } else if (payload.kind === 'error') {
-    toast(`La connexion à ${name} s’est arrêtée (${payload.detail}).`, 6000);
+    toast(`La connexion à ${name} s’est arrêtée (${payload.detail}).`, 'err', 7000);
   }
 });
 
 /* ---------- connexion rapide et Tailscale ---------- */
 $('#quick').onsubmit = (e) => {
   e.preventDefault();
-  const ip = $('#quick-ip').value.trim(); if (!ip) return;
+  const ip = $('#quick-ip').value.trim(); if (!ip) { $('#quick-ip').focus(); return; }
   $('#quick-ip').value = '';
   const known = state.conns.find((c) => c.host === ip);
   if (known) return connectTo(known);
@@ -234,17 +241,21 @@ $('#quick').onsubmit = (e) => {
 
 function renderPeers() {
   const box = $('#peers');
-  if (!state.peers.length) { box.innerHTML = '<div class="info">Tailscale n’est pas installé ou pas connecté sur cet ordinateur.</div>'; return; }
-  box.innerHTML = state.peers.slice(0, 8).map((p, i) => {
+  const online = state.peers.filter((p) => p.online).length;
+  $('#st-ts').innerHTML = state.peers.length
+    ? `<span class="live">●</span> Tailscale : ${online} appareil${online > 1 ? 's' : ''} en ligne`
+    : 'Tailscale non détecté';
+  if (!state.peers.length) { box.innerHTML = '<div class="info">Tailscale n’est pas installé ou pas connecté sur cet ordinateur. Tes PC restent joignables par leur IP locale.</div>'; return; }
+  box.innerHTML = state.peers.slice(0, 9).map((p, i) => {
     const known = state.conns.some((c) => c.host === p.ip);
-    return `<button class="peer ${known ? 'known' : ''}" data-i="${i}" title="${known ? 'Se connecter' : 'Ajouter ce PC'}">
-      <span class="d ${p.online ? 'on' : ''}"></span>
-      <span class="n"><b>${esc(p.name)}</b><small>${esc(p.ip)}</small></span>
-      <span class="plus">${known ? 'Enregistré' : '+ Ajouter'}</span></button>`;
+    return `<button class="home-card" data-i="${i}" title="${known ? 'Se connecter' : 'Ajouter ce PC'}">
+      <span class="ic">${icon('laptop')}<i class="${p.online ? 'on' : ''}"></i></span>
+      <span class="txt"><b>${esc(p.name)}</b><span>${esc(p.ip)} · ${p.online ? 'en ligne' : 'hors ligne'}</span></span>
+      <span class="chip ${known ? '' : 'ts'}">${known ? 'Enregistré' : '+ Ajouter'}</span></button>`;
   }).join('');
 }
 $('#peers').onclick = (e) => {
-  const b = e.target.closest('.peer'); if (!b) return;
+  const b = e.target.closest('[data-i]'); if (!b) return;
   const p = state.peers[b.dataset.i];
   const known = state.conns.find((c) => c.host === p.ip);
   if (known) connectTo(known); else openEdit(null, { name: p.name, host: p.ip });
@@ -254,21 +265,24 @@ async function loadPeers() {
   renderPeers();
 }
 $('#ts-refresh').onclick = loadPeers;
-$('#add-big').onclick = () => openEdit();
 
-/* ---------- moteur FreeRDP ---------- */
+/* ---------- moteur de connexion ---------- */
 function renderEngine() {
   const w = $('#engine-warn');
-  if (state.engine?.path) {
+  const e = state.engine;
+  if (e?.path) {
     w.hidden = true;
-    $('#about-engine').textContent = `Moteur : FreeRDP ${state.engine.version || ''} — ${state.engine.path}`;
+    const label = e.kind === 'mstsc' ? 'Bureau à distance Windows' : `FreeRDP ${e.version || ''}`.trim();
+    $('#about-engine').textContent = `Moteur : ${label} — ${e.path}`;
+    $('#st-engine').textContent = label;
     return;
   }
   w.hidden = false;
-  w.innerHTML = state.os === 'macos'
-    ? '<b>FreeRDP n’est pas installé.</b> Installe-le avec Homebrew dans le Terminal : <code>brew install freerdp</code>, puis relance SXM Remote.'
-    : '<b>FreeRDP n’est pas installé.</b> Installe-le dans un terminal : <code>sudo dnf install freerdp</code>, puis relance SXM Remote.';
+  w.innerHTML = icon('triangle-alert') + (state.os === 'macos'
+    ? '<span><b>FreeRDP n’est pas installé.</b> Dans le Terminal : <code>brew install freerdp</code>, puis relance SXM Remote.</span>'
+    : '<span><b>FreeRDP n’est pas installé.</b> Dans un terminal : <code>sudo dnf install freerdp</code>, puis relance SXM Remote.</span>');
   $('#about-engine').textContent = 'Moteur : FreeRDP non installé.';
+  $('#st-engine').textContent = 'Moteur non installé';
 }
 
 /* ---------- mises à jour ---------- */
@@ -297,18 +311,20 @@ async function installUpdate() {
   btns.forEach((b) => (b.disabled = true));
   const say = (m) => { $('#update-text').textContent = m; $('#upd-status').textContent = m; };
   say(`Téléchargement de la version ${u.version}…`);
-  if (state.os !== 'macos') setTimeout(() => say('Installation… Fedora va te demander ton mot de passe.'), 2500);
+  if (state.os === 'linux') setTimeout(() => say('Installation… Fedora va te demander ton mot de passe.'), 2500);
   try {
     const res = await invoke('install_update', { url: u.url });
     if (res === 'opened') {
       say(`La version ${u.version} est téléchargée. Glisse SXM Remote dans Applications pour remplacer l’ancienne, puis relance-la.`);
+    } else if (res === 'launched') {
+      say(`L’installation de la version ${u.version} démarre…`);
     } else {
       say(`SXM Remote ${u.version} est installée. Redémarrage…`);
       setTimeout(() => invoke('restart'), 1200);
     }
   } catch (e) {
     say(e === 'cancelled' ? 'Mise à jour annulée.' : 'La mise à jour a échoué.');
-    if (e !== 'cancelled') toast('La mise à jour n’a pas pu être installée :\n' + e, 8000);
+    if (e !== 'cancelled') toast('La mise à jour n’a pas pu être installée :\n' + e, 'err', 9000);
     btns.forEach((b) => (b.disabled = false));
   }
 }
@@ -331,8 +347,9 @@ $('#upd-auto').onchange = async (e) => {
   $('#about-title').textContent = 'SXM Remote ' + state.version;
   $('#upd-status').textContent = `Version installée : ${state.version}`;
   $('#upd-auto').checked = state.settings.auto_update !== false;
+  if (state.os === 'windows') $('#fs-key').textContent = 'Pause';
   document.body.classList.add('os-' + state.os);
-  renderEngine(); renderCards(); renderPeers();
+  show('home'); renderEngine(); renderCards(); renderPeers();
   loadPeers();
   if (state.settings.auto_update !== false) setTimeout(() => checkUpdate(false), 2500);
 })();
