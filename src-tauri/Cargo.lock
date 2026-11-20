@@ -4016,7 +4016,7 @@ dependencies = [
 
 [[package]]
 name = "sxm-remote"
-version = "2.1.0"
+version = "2.1.1"
 dependencies = [
  "dirs 5.0.1",
  "keyring",
