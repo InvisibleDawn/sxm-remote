@@ -280,7 +280,7 @@ function renderEngine() {
   w.hidden = false;
   w.innerHTML = icon('triangle-alert') + (state.os === 'macos'
     ? '<span><b>FreeRDP n’est pas installé.</b> Dans le Terminal : <code>brew install freerdp</code>, puis relance SXM Remote.</span>'
-    : '<span><b>FreeRDP n’est pas installé.</b> Dans un terminal : <code>sudo dnf install freerdp</code>, puis relance SXM Remote.</span>');
+    : '<span><b>FreeRDP n’est pas installé.</b> Dans un terminal : <code>sudo apt install freerdp3-x11</code> (Debian, SXM Linux) ou <code>sudo dnf install freerdp</code> (Fedora), puis relance SXM Remote.</span>');
   $('#about-engine').textContent = 'Moteur : FreeRDP non installé.';
   $('#st-engine').textContent = 'Moteur non installé';
 }

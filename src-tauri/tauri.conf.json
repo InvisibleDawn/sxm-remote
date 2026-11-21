@@ -27,6 +27,7 @@
     "active": true,
     "targets": [
       "rpm",
+      "deb",
       "dmg",
       "nsis"
     ],
@@ -49,6 +50,14 @@
           "polkit",
           "webkit2gtk4.1",
           "gtk3"
+        ]
+      },
+      "deb": {
+        "depends": [
+          "freerdp3-x11 | freerdp2-x11",
+          "libsecret-1-0",
+          "polkitd | policykit-1",
+          "pkexec | policykit-1"
         ]
       }
     },
