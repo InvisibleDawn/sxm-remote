@@ -1,6 +1,6 @@
 name: Compilation SXM Remote
 
-# Compile l'installateur .exe (Windows), le .rpm (Fedora) et le .dmg (macOS) puis publie une Release
+# Compile l'installateur .exe (Windows), le .rpm (Fedora), le .deb (Debian / SXM Linux) et le .dmg (macOS) puis publie une Release
 # dès que la version change dans src-tauri/tauri.conf.json.
 on:
   push:
@@ -99,11 +99,40 @@ jobs:
           name: SXM-Remote-Fedora
           path: src-tauri/target/release/bundle/rpm/*.rpm
 
+  debian:
+    name: Debian 13 / SXM Linux (.deb)
+    needs: check
+    if: needs.check.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    container: debian:13
+    steps:
+      - name: Dépendances Debian
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git ca-certificates build-essential curl file pkg-config libssl-dev libdbus-1-dev \
+            libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libsoup-3.0-dev libayatana-appindicator3-dev \
+            nodejs npm
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: npm install
+      - run: npx tauri build --bundles deb
+        working-directory: src-tauri
+      - name: Le paquet s'installe avec apt
+        run: |
+          DEBIAN_FRONTEND=noninteractive apt-get install -y ./src-tauri/target/release/bundle/deb/*.deb
+          test -x /usr/bin/sxm-remote
+          command -v xfreerdp3 || command -v xfreerdp
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SXM-Remote-Debian
+          path: src-tauri/target/release/bundle/deb/*.deb
+
   release:
     name: Publication sur la page Releases
-    needs: [check, windows, macos, fedora]
+    needs: [check, windows, macos, fedora, debian]
     # Publie ce qui est prêt, même si une plateforme a échoué (ex. Mac indisponible chez GitHub)
-    if: always() && needs.check.outputs.publish == 'true' && (needs.fedora.result == 'success' || needs.macos.result == 'success' || needs.windows.result == 'success')
+    if: always() && needs.check.outputs.publish == 'true' && (needs.fedora.result == 'success' || needs.debian.result == 'success' || needs.macos.result == 'success' || needs.windows.result == 'success')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -120,6 +149,7 @@ jobs:
           body: |
             **Windows** (10 et 11) : `SXM.Remote_${{ needs.check.outputs.version }}_x64-setup.exe`
             **Fedora** : `SXM.Remote-${{ needs.check.outputs.version }}-1.x86_64.rpm` → `sudo dnf install ./SXM.Remote-*.rpm`
+            **Debian / Ubuntu / SXM Linux** : `SXM.Remote_${{ needs.check.outputs.version }}_amd64.deb` → `sudo apt install ./SXM.Remote_*_amd64.deb`
             **macOS** (Intel + Apple Silicon) : `SXM.Remote_${{ needs.check.outputs.version }}_universal.dmg`
 
             Le fichier `…-depuis-v1.noarch.rpm` est le même paquet Fedora : il sert uniquement à la mise à jour automatique des versions 1.x.

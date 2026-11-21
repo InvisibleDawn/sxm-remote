@@ -458,16 +458,27 @@ async fn check_update() -> Result<Release, String> {
     let pick = assets.iter().find(|u| u.ends_with(".dmg"));
     #[cfg(windows)]
     let pick = assets.iter().find(|u| u.ends_with("-setup.exe")).or_else(|| assets.iter().find(|u| u.ends_with(".exe")));
+    // Debian, Ubuntu, SXM Linux : paquet .deb ; Fedora : paquet .rpm
     #[cfg(target_os = "linux")]
-    let pick = assets
-        .iter()
-        .find(|u| u.ends_with(".x86_64.rpm"))
-        .or_else(|| assets.iter().find(|u| u.ends_with(".rpm")));
+    let pick = if is_debian() {
+        assets.iter().find(|u| u.ends_with("_amd64.deb"))
+    } else {
+        assets
+            .iter()
+            .find(|u| u.ends_with(".x86_64.rpm"))
+            .or_else(|| assets.iter().find(|u| u.ends_with(".rpm")))
+    };
     Ok(Release {
         version: v.get("tag_name").and_then(|t| t.as_str()).unwrap_or("0").trim_start_matches(['v', 'V']).to_string(),
         url: pick.cloned(),
         notes: v.get("body").and_then(|b| b.as_str()).unwrap_or_default().to_string(),
     })
+}
+
+/// Système de la famille Debian (Debian, Ubuntu, SXM Linux) : les mises à jour passent par le .deb.
+#[cfg(target_os = "linux")]
+fn is_debian() -> bool {
+    std::path::Path::new("/etc/debian_version").exists()
 }
 
 #[tauri::command]
@@ -526,8 +537,10 @@ async fn install_update(app: AppHandle, url: String) -> Result<String, String> {
         return Ok("launched".into());
     }
     let _ = &app;
+    // .deb (Debian, SXM Linux) : apt-get installe aussi les dépendances manquantes ; .rpm (Fedora) : dnf
+    let installer: &[&str] = if file.ends_with(".deb") { &["apt-get", "install", "-y"] } else { &["dnf", "install", "-y"] };
     let out = cmd("pkexec")
-        .args(["dnf", "install", "-y"])
+        .args(installer)
         .arg(&dest)
         .output()
         .await
